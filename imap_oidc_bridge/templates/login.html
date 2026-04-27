@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, sans-serif; max-width: 24rem; margin: 4rem auto; padding: 0 1rem; }
+      h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+      p.hint { color: #666; margin-top: 0; font-size: 0.9rem; }
+      form { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
+      label { font-size: 0.85rem; }
+      input { padding: 0.5rem; font-size: 1rem; border: 1px solid #888; border-radius: 4px; }
+      button { padding: 0.5rem; font-size: 1rem; border: 0; border-radius: 4px; background: #2563eb; color: white; cursor: pointer; }
+      button:hover { background: #1d4ed8; }
+      .error { color: #b91c1c; font-size: 0.9rem; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <h1>{{ title }}</h1>
+    <p class="hint">Sign in with your mailbox credentials.</p>
+    <form method="post" action="{{ form_action }}">
+      <input type="hidden" name="request_id" value="{{ request_id }}" />
+      <label>
+        Email
+        <input type="email" name="email" autocomplete="username" required autofocus value="{{ email }}" />
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <button type="submit">Sign in</button>
+    </form>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  </body>
+</html>

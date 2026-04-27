@@ -1,0 +1,20 @@
+services:
+  imap-oidc-bridge:
+    image: ghcr.io/marc-schuetze/imap-oidc-bridge:latest
+    container_name: imap-oidc-bridge
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    networks:
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.imap-oidc-bridge.rule: "Host(`imap-bridge.example.com`)"
+      traefik.http.routers.imap-oidc-bridge.entrypoints: "websecure"
+      traefik.http.routers.imap-oidc-bridge.tls.certresolver: "letsencrypt"
+      traefik.http.services.imap-oidc-bridge.loadbalancer.server.port: "8000"
+
+networks:
+  traefik:
+    external: true
