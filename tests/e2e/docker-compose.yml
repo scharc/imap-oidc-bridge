@@ -1,0 +1,108 @@
+# End-to-end test stack: Authentik + the bridge + Greenmail.
+#
+# Browse to http://authentik.localtest.me:9000 (admin akadmin / e2e-admin).
+# *.localtest.me resolves to 127.0.0.1 publicly, so both your host browser
+# and the Authentik container reach the bridge at the same URL — which is
+# what OIDC issuer matching requires.
+#
+# Bring up:   docker compose -f tests/e2e/docker-compose.yml up -d --build
+# Tear down:  docker compose -f tests/e2e/docker-compose.yml down -v
+
+x-authentik-env: &authentik-env
+  AUTHENTIK_REDIS__HOST: redis
+  AUTHENTIK_POSTGRESQL__HOST: postgres
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+  AUTHENTIK_SECRET_KEY: e2e-not-a-real-secret-key
+  AUTHENTIK_BOOTSTRAP_PASSWORD: e2e-admin
+  AUTHENTIK_BOOTSTRAP_TOKEN: e2e-admin-token
+  AUTHENTIK_LOG_LEVEL: info
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+      POSTGRES_PASSWORD: authentik
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  greenmail:
+    image: greenmail/standalone:2.1.5
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.imap
+        -Dgreenmail.setup.test.api
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.auth.disabled=false
+    ports:
+      - "33143:3143"
+      - "38080:8080"
+
+  imap-bridge:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: imap-oidc-bridge:e2e
+    depends_on:
+      - greenmail
+    environment:
+      IMAP_HOST: greenmail
+      IMAP_PORT: "3143"
+      IMAP_SSL: "false"
+      OIDC_ISSUER: http://imap-bridge.localtest.me:8181
+      OIDC_CLIENT_ID: e2e-client
+      OIDC_CLIENT_SECRET: e2e-client-secret
+      OIDC_REDIRECT_URIS: '["http://authentik.localtest.me:9000/source/oauth/callback/imap-bridge/"]'
+      SESSION_SECRET: e2e-session-secret-not-for-prod
+      LOG_LEVEL: DEBUG
+    volumes:
+      - bridge-data:/data
+    ports:
+      - "8181:8000"
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.10
+    command: server
+    environment: *authentik-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./blueprints:/blueprints/custom:ro
+    ports:
+      - "9000:9000"
+    extra_hosts:
+      - "imap-bridge.localtest.me:host-gateway"
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.10
+    command: worker
+    environment: *authentik-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./blueprints:/blueprints/custom:ro
+    extra_hosts:
+      - "imap-bridge.localtest.me:host-gateway"
+
+volumes:
+  bridge-data:

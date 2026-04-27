@@ -1,0 +1,50 @@
+# Authentik blueprint: register the imap-oidc-bridge as an OAuth (OIDC) source.
+# Mounted into /blueprints/custom and auto-applied on Authentik startup.
+
+version: 1
+metadata:
+  name: imap-bridge-e2e
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+
+entries:
+  - identifiers:
+      name: imap-bridge-users
+    model: authentik_core.group
+
+  # Pre-seed the test users so `user_matching_mode=email_link` finds them.
+  # In production you would either (a) pre-seed the user list the same way
+  # or (b) customise the enrollment flow to auto-create without interaction.
+  - identifiers:
+      username: alice
+    model: authentik_core.user
+    attrs:
+      name: Alice
+      email: alice@example.com
+      groups:
+        - !Find [authentik_core.group, [name, imap-bridge-users]]
+
+  - identifiers:
+      username: bob
+    model: authentik_core.user
+    attrs:
+      name: Bob
+      email: bob@example.com
+      groups:
+        - !Find [authentik_core.group, [name, imap-bridge-users]]
+
+  - identifiers:
+      slug: imap-bridge
+    model: authentik_sources_oauth.oauthsource
+    attrs:
+      name: IMAP Bridge
+      enabled: true
+      provider_type: openidconnect
+      consumer_key: e2e-client
+      consumer_secret: e2e-client-secret
+      oidc_well_known_url: http://imap-bridge.localtest.me:8181/.well-known/openid-configuration
+      user_matching_mode: email_link
+      authentication_flow:
+        !Find [authentik_flows.flow, [slug, default-source-authentication]]
+      enrollment_flow:
+        !Find [authentik_flows.flow, [slug, default-source-enrollment]]

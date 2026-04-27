@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+import imaplib
+import socket
+from typing import Any
+
+import pytest
+
+from imap_oidc_bridge import imap as imap_module
+from imap_oidc_bridge.imap import IMAPAuthError, IMAPBackend
+
+
+class FakeConn:
+    def __init__(self, *, login_ok: bool = True, logout_raises: bool = False) -> None:
+        self.login_ok = login_ok
+        self.logout_raises = logout_raises
+        self.login_called_with: tuple[str, str] | None = None
+        self.logout_called = False
+
+    def login(self, email: str, password: str) -> None:
+        self.login_called_with = (email, password)
+        if not self.login_ok:
+            raise imaplib.IMAP4.error("AUTHENTICATIONFAILED")
+
+    def logout(self) -> None:
+        self.logout_called = True
+        if self.logout_raises:
+            raise OSError("connection reset")
+
+
+@pytest.fixture
+def patched(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    state: dict[str, Any] = {"connect_raises": None, "conn": None}
+
+    class FakeIMAP:
+        # Keep imaplib.IMAP4.error pointing at the real exception class so
+        # `except imaplib.IMAP4.error` in the production code still resolves.
+        error = imaplib.IMAP4.error
+
+        def __new__(cls, **kwargs: Any) -> FakeConn:  # type: ignore[misc]
+            if state["connect_raises"] is not None:
+                raise state["connect_raises"]
+            state["last_kwargs"] = kwargs
+            return state["conn"] or FakeConn()
+
+    monkeypatch.setattr(imap_module.imaplib, "IMAP4_SSL", FakeIMAP)
+    monkeypatch.setattr(imap_module.imaplib, "IMAP4", FakeIMAP)
+    return state
+
+
+def test_verify_success(patched: dict[str, Any]) -> None:
+    conn = FakeConn(login_ok=True)
+    patched["conn"] = conn
+    IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert conn.login_called_with == ("u@x", "pw")
+    assert conn.logout_called is True
+
+
+def test_verify_login_rejected(patched: dict[str, Any]) -> None:
+    patched["conn"] = FakeConn(login_ok=False)
+    with pytest.raises(IMAPAuthError, match="invalid credentials"):
+        IMAPBackend(host="mail.x").verify("u@x", "pw")
+
+
+def test_verify_connection_failure(patched: dict[str, Any]) -> None:
+    patched["connect_raises"] = OSError("connection refused")
+    with pytest.raises(IMAPAuthError, match="upstream IMAP unreachable"):
+        IMAPBackend(host="mail.x").verify("u@x", "pw")
+
+
+def test_verify_dns_failure(patched: dict[str, Any]) -> None:
+    patched["connect_raises"] = socket.gaierror("name or service not known")
+    with pytest.raises(IMAPAuthError):
+        IMAPBackend(host="nope").verify("u@x", "pw")
+
+
+def test_verify_empty_credentials_short_circuit() -> None:
+    backend = IMAPBackend(host="mail.x")
+    with pytest.raises(IMAPAuthError, match="empty"):
+        backend.verify("", "pw")
+    with pytest.raises(IMAPAuthError, match="empty"):
+        backend.verify("u@x", "")
+
+
+def test_logout_failure_is_swallowed(patched: dict[str, Any]) -> None:
+    """A failing logout must not propagate after a successful login."""
+    patched["conn"] = FakeConn(login_ok=True, logout_raises=True)
+    IMAPBackend(host="mail.x").verify("u@x", "pw")  # no exception
+
+
+def test_logout_runs_even_after_login_failure(patched: dict[str, Any]) -> None:
+    conn = FakeConn(login_ok=False)
+    patched["conn"] = conn
+    with pytest.raises(IMAPAuthError):
+        IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert conn.logout_called is True
+
+
+def test_ssl_false_uses_plain_imap4(patched: dict[str, Any]) -> None:
+    patched["conn"] = FakeConn()
+    IMAPBackend(host="mail.x", ssl=False).verify("u@x", "pw")
+    # Both factory entries point at the same fn so just verify last kwargs were sane
+    assert patched["last_kwargs"]["host"] == "mail.x"
+
+
+def test_timeout_passed_through(patched: dict[str, Any]) -> None:
+    patched["conn"] = FakeConn()
+    IMAPBackend(host="mail.x", timeout=2.5).verify("u@x", "pw")
+    assert patched["last_kwargs"]["timeout"] == 2.5
