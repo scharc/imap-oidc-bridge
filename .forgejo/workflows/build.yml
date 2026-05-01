@@ -1,9 +1,15 @@
-name: build
+name: build-imap-oidc-bridge
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - 'imap_oidc_bridge/**'
+      - '.forgejo/workflows/build.yml'
   workflow_dispatch: {}
 
 jobs:
@@ -13,25 +19,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: verify secret + login
-        # Builds and pushes git.schuetze.io/cluster/imap-oidc-bridge.
-        # Auth as marc using REGISTRY_PUSH_TOKEN (PAT scoped package: R+W);
-        # marc is admin on cluster/, so it can push to cluster/* packages.
-        # Avoid `echo $TOKEN | docker login --password-stdin` because Forgejo
-        # Actions runs steps under `set -e -o pipefail`; if the secret is empty
-        # the pipe SIGPIPEs and the step dies with exit 141 + zero log output,
-        # which is hell to debug. Write the secret to a tempfile and use
-        # --password-stdin < file instead.
+      - name: login to forgejo registry
         run: |
-          SECRET_FILE=$(mktemp)
-          chmod 600 "$SECRET_FILE"
-          printf '%s' "${{ secrets.REGISTRY_PUSH_TOKEN }}" > "$SECRET_FILE"
-          if [ ! -s "$SECRET_FILE" ]; then
-            echo "REGISTRY_PUSH_TOKEN secret is empty — bail" >&2
-            exit 2
-          fi
-          docker login git.schuetze.io --username marc --password-stdin < "$SECRET_FILE"
-          rm -f "$SECRET_FILE"
+          echo "${{ secrets.REGISTRY_PUSH_TOKEN }}" | \
+            docker login git.schuetze.io \
+              --username marc \
+              --password-stdin
 
       - name: build and push image
         run: |
@@ -39,18 +32,9 @@ jobs:
           IMAGE=git.schuetze.io/cluster/imap-oidc-bridge
           SHA="${{ github.sha }}"
           SHORT_SHA="${SHA:0:7}"
-          REF="${{ github.ref }}"
-
           docker build \
             --tag "${IMAGE}:latest" \
-            --tag "${IMAGE}:sha-${SHORT_SHA}" \
+            --tag "${IMAGE}:${SHORT_SHA}" \
             .
           docker push "${IMAGE}:latest"
-          docker push "${IMAGE}:sha-${SHORT_SHA}"
-
-          # If this run was triggered by a vX.Y.Z tag, also publish the semver
-          if [[ "$REF" == refs/tags/v* ]]; then
-            VERSION="${REF#refs/tags/v}"
-            docker tag "${IMAGE}:sha-${SHORT_SHA}" "${IMAGE}:${VERSION}"
-            docker push "${IMAGE}:${VERSION}"
-          fi
+          docker push "${IMAGE}:${SHORT_SHA}"
