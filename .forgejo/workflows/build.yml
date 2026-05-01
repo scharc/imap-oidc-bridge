@@ -1,0 +1,53 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch: {}
+
+# Builds and pushes git.schuetze.io/cluster/imap-oidc-bridge.
+# Tags applied:
+#   * :latest                always (main branch + tags)
+#   * :sha-<short>           every commit
+#   * :<semver>              when pushed via a `vX.Y.Z` tag (no `v` prefix in the tag)
+
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: login to forgejo registry
+        # Auth as marc using REGISTRY_PUSH_TOKEN (PAT scoped package: R+W);
+        # marc is admin on the cluster/ org so it can push to cluster/* packages.
+        # Same pattern as cluster/schuetzeio:.forgejo/workflows/build-*.yml.
+        run: |
+          echo "${{ secrets.REGISTRY_PUSH_TOKEN }}" | \
+            docker login git.schuetze.io \
+              --username marc \
+              --password-stdin
+
+      - name: build and push image
+        run: |
+          set -eux
+          IMAGE=git.schuetze.io/cluster/imap-oidc-bridge
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          REF="${{ github.ref }}"
+
+          TAGS=("--tag" "${IMAGE}:latest" "--tag" "${IMAGE}:sha-${SHORT_SHA}")
+          # If this run was triggered by a vX.Y.Z tag, also publish the semver
+          if [[ "$REF" == refs/tags/v* ]]; then
+            VERSION="${REF#refs/tags/v}"
+            TAGS+=("--tag" "${IMAGE}:${VERSION}")
+          fi
+
+          docker build "${TAGS[@]}" .
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:sha-${SHORT_SHA}"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            VERSION="${REF#refs/tags/v}"
+            docker push "${IMAGE}:${VERSION}"
+          fi
