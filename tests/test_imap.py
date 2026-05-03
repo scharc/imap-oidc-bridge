@@ -11,14 +11,23 @@ from imap_oidc_bridge.imap import IMAPAuthError, IMAPBackend
 
 
 class FakeConn:
-    def __init__(self, *, login_ok: bool = True, logout_raises: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        login_ok: bool = True,
+        logout_raises: bool = False,
+        login_raises: BaseException | None = None,
+    ) -> None:
         self.login_ok = login_ok
         self.logout_raises = logout_raises
+        self.login_raises = login_raises
         self.login_called_with: tuple[str, str] | None = None
         self.logout_called = False
 
     def login(self, email: str, password: str) -> None:
         self.login_called_with = (email, password)
+        if self.login_raises is not None:
+            raise self.login_raises
         if not self.login_ok:
             raise imaplib.IMAP4.error("AUTHENTICATIONFAILED")
 
@@ -107,3 +116,26 @@ def test_timeout_passed_through(patched: dict[str, Any]) -> None:
     patched["conn"] = FakeConn()
     IMAPBackend(host="mail.x", timeout=2.5).verify("u@x", "pw")
     assert patched["last_kwargs"]["timeout"] == 2.5
+
+
+def test_login_timeout_returns_authn_error_not_500(patched: dict[str, Any]) -> None:
+    """Regression: SSL read timeout during LOGIN must convert to IMAPAuthError.
+
+    Previously TimeoutError escaped to FastAPI as a 500. Verifies the bridge
+    fails closed with a 401 to the consumer instead, and still cleans up
+    the socket via logout().
+    """
+    conn = FakeConn(login_raises=TimeoutError("The read operation timed out"))
+    patched["conn"] = conn
+    with pytest.raises(IMAPAuthError, match="upstream IMAP error"):
+        IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert conn.logout_called is True
+
+
+def test_login_connection_reset_returns_authn_error(patched: dict[str, Any]) -> None:
+    """Mid-LOGIN socket drop (ConnectionResetError is OSError) → IMAPAuthError."""
+    conn = FakeConn(login_raises=ConnectionResetError("Connection reset by peer"))
+    patched["conn"] = conn
+    with pytest.raises(IMAPAuthError, match="upstream IMAP error"):
+        IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert conn.logout_called is True

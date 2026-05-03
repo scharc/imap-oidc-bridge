@@ -48,6 +48,12 @@ class IMAPBackend:
             except imaplib.IMAP4.error as exc:
                 log.info("imap.login_rejected", email=email, error=str(exc))
                 raise IMAPAuthError("invalid credentials") from exc
+            except (TimeoutError, OSError) as exc:
+                # Socket dropped / SSL read timed out / connection reset mid-LOGIN.
+                # Without this clause the bare exception escapes the request handler
+                # and the consumer sees a 500 — fail closed visibly with a 401 instead.
+                log.warning("imap.login_transport_error", email=email, error=str(exc))
+                raise IMAPAuthError("upstream IMAP error") from exc
         finally:
             with contextlib.suppress(Exception):
                 conn.logout()
