@@ -1,0 +1,101 @@
+# Production-shape Authentik blueprint that wires the bridge end-to-end:
+#   1. an OAuth source pointing at imap-oidc-bridge
+#   2. a group that bridge-authenticated users belong to
+#   3. an OIDC provider for an example downstream application (Nextcloud)
+#   4. the Application + group binding so only bridge users can reach it
+#
+# Drop this file into Authentik's /blueprints/custom/ mount, edit the
+# placeholders below, then restart the worker (or wait for the discovery
+# task to pick it up). All resources are upserted by their identifier so
+# you can re-apply safely.
+#
+# Placeholders to replace before applying:
+#   - https://imap-bridge.example.com   → public URL of your bridge
+#   - https://sso.example.com           → public URL of your Authentik
+#   - https://cloud.example.com         → public URL of your downstream app
+#   - imap-bridge / IMAP-BRIDGE-CLIENT-SECRET → match your bridge env
+#   - cloud-client-id / CLOUD-CLIENT-SECRET   → match the app's OIDC config
+#
+# A full step-by-step walkthrough lives in docs/authentik-setup.md.
+
+version: 1
+metadata:
+  name: imap-oidc-bridge
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+
+entries:
+  # ---------------------------------------------------------------------
+  # 1. Group for everyone who logs in via the IMAP bridge.
+  # ---------------------------------------------------------------------
+  - identifiers:
+      name: imap-bridge-users
+    model: authentik_core.group
+
+  # ---------------------------------------------------------------------
+  # 2. The OAuth (OIDC) source that delegates auth to the bridge.
+  #    Authentik will fetch the discovery doc on save; the bridge must
+  #    be reachable from the Authentik server + worker containers.
+  # ---------------------------------------------------------------------
+  - identifiers:
+      slug: imap-bridge
+    model: authentik_sources_oauth.oauthsource
+    attrs:
+      name: IMAP Bridge
+      enabled: true
+      provider_type: openidconnect
+      consumer_key: imap-bridge
+      consumer_secret: IMAP-BRIDGE-CLIENT-SECRET
+      oidc_well_known_url: https://imap-bridge.example.com/.well-known/openid-configuration
+      user_matching_mode: email_link
+      authentication_flow:
+        !Find [authentik_flows.flow, [slug, default-source-authentication]]
+      enrollment_flow:
+        !Find [authentik_flows.flow, [slug, default-source-enrollment]]
+
+  # ---------------------------------------------------------------------
+  # 3. An OIDC provider for one example downstream app (Nextcloud here,
+  #    swap for whatever you're protecting). The redirect URI must match
+  #    what the app is configured with.
+  # ---------------------------------------------------------------------
+  - id: cloud-provider
+    identifiers:
+      name: cloud-provider
+    model: authentik_providers_oauth2.oauth2provider
+    attrs:
+      client_type: confidential
+      client_id: cloud-client-id
+      client_secret: CLOUD-CLIENT-SECRET
+      redirect_uris:
+        - matching_mode: strict
+          url: https://cloud.example.com/apps/oidc_login/oidc
+      signing_key:
+        !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+      authorization_flow:
+        !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+
+  # ---------------------------------------------------------------------
+  # 4. The application surface in Authentik's user UI + the access
+  #    binding that restricts it to bridge-authenticated users.
+  # ---------------------------------------------------------------------
+  - identifiers:
+      slug: cloud
+    model: authentik_core.application
+    attrs:
+      name: Cloud
+      provider:
+        !KeyOf cloud-provider
+      meta_launch_url: https://cloud.example.com
+      policy_engine_mode: any
+
+  - identifiers:
+      target:
+        !Find [authentik_core.application, [slug, cloud]]
+      group:
+        !Find [authentik_core.group, [name, imap-bridge-users]]
+      order: 0
+    model: authentik_policies.policybinding

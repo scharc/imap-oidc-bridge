@@ -6,9 +6,11 @@ built-in OIDC client — trust mailbox passwords as the source of truth, without
 running an LDAP shim and without giving the upstream consumer your IMAP
 credentials.
 
-> **Status:** v0.1, single-tenant, single-client. Authorization code flow only.
-> No refresh tokens, no PKCE yet. Suitable for low-volume self-hosted setups
-> where the IMAP server is the existing user database.
+> **Status:** v0.1.0a1 — alpha. Single-tenant, single-client, authorization
+> code flow only. No refresh tokens, no PKCE yet. Suitable for low-volume
+> self-hosted setups where the IMAP server is the existing user database.
+> Tested end-to-end against Authentik 2024.10 + Greenmail; not yet exercised
+> in production.
 
 ## Why
 
@@ -47,7 +49,14 @@ ID token containing `sub=email` and `email_verified=true`. That's it.
 
 ## Quickstart (Docker)
 
+No prebuilt image is published yet — this is a source-only alpha. Build it
+yourself:
+
 ```bash
+git clone https://github.com/marc-schuetze/imap-oidc-bridge.git
+cd imap-oidc-bridge
+docker build -t imap-oidc-bridge:local .
+
 docker run --rm \
   -p 8000:8000 \
   -v $PWD/data:/data \
@@ -57,7 +66,7 @@ docker run --rm \
   -e OIDC_CLIENT_SECRET=$(openssl rand -hex 32) \
   -e OIDC_REDIRECT_URIS='["https://sso.example.com/source/oauth/callback/imap-bridge/"]' \
   -e SESSION_SECRET=$(openssl rand -hex 32) \
-  ghcr.io/marc-schuetze/imap-oidc-bridge:latest
+  imap-oidc-bridge:local
 ```
 
 A complete example with Traefik labels lives in
@@ -86,8 +95,15 @@ All config is environment variables (see [`.env.example`](./.env.example)):
 
 ## Wiring it into Authentik
 
-See [`docs/authentik-setup.md`](./docs/authentik-setup.md) for a step-by-step
-walkthrough.
+Two paths:
+
+- **Click-through** — see [`docs/authentik-setup.md`](./docs/authentik-setup.md)
+  for the admin-UI walkthrough.
+- **GitOps / declarative** — drop
+  [`examples/authentik-blueprint.yaml`](./examples/authentik-blueprint.yaml)
+  into Authentik's `/blueprints/custom/` mount, edit the placeholder URLs +
+  secrets, and the source / group / provider / application are all created
+  for you on the next worker tick.
 
 The short version:
 1. **Customization → Property Mappings → Create**: a Source property mapping
@@ -122,6 +138,8 @@ The short version:
 
 ## Limitations / roadmap
 
+- v0.1.0a1 (now): source-only — no prebuilt image is published. Build from
+  the `Dockerfile` in your own environment.
 - v0.2: PKCE, refresh tokens, Hetzner-style autoconfig discovery.
 - v0.3: multi-client (so one container can serve multiple consumers).
 - v0.4: optional groups via a static membership map, for "all imap users → group X" without Authentik policies.

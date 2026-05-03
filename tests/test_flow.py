@@ -68,7 +68,6 @@ def test_full_authorization_code_flow(client: TestClient) -> None:
     assert claims["iss"] == "https://bridge.test"
     assert claims["nonce"] == "n-0S6_WzA2Mj"
 
-    # /userinfo with the bearer token returns the same identity
     ui = client.get("/userinfo", headers={"Authorization": f"Bearer {id_token}"})
     assert ui.status_code == 200
     assert ui.json()["sub"] == "alice@example.com"

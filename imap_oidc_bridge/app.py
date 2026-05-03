@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
+from . import __version__
 from .config import Settings
 from .imap import IMAPAuthError, IMAPBackend
 from .keys import SigningKey, load_or_create
@@ -56,7 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         directory=str(Path(__file__).parent / "templates"),
     )
 
-    app = FastAPI(title="imap-oidc-bridge", version="0.1.0")
+    app = FastAPI(title="imap-oidc-bridge", version=__version__)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
