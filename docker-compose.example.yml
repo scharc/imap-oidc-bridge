@@ -3,7 +3,7 @@ services:
     # No prebuilt image is published yet — build from a checkout of this repo:
     #   docker compose build
     build:
-      context: https://github.com/marc-schuetze/imap-oidc-bridge.git#main
+      context: https://github.com/scharc/imap-oidc-bridge.git#main
     image: imap-oidc-bridge:local
     container_name: imap-oidc-bridge
     restart: unless-stopped

@@ -53,7 +53,7 @@ No prebuilt image is published yet — this is a source-only alpha. Build it
 yourself:
 
 ```bash
-git clone https://github.com/marc-schuetze/imap-oidc-bridge.git
+git clone https://github.com/scharc/imap-oidc-bridge.git
 cd imap-oidc-bridge
 docker build -t imap-oidc-bridge:local .
 

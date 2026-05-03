@@ -5,7 +5,7 @@ description = "Tiny OIDC identity provider that authenticates against an IMAP se
 authors = ["Marc Schuetze <agent-provocateur@zkm.de>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/marc-schuetze/imap-oidc-bridge"
+repository = "https://github.com/scharc/imap-oidc-bridge"
 keywords = ["oidc", "imap", "authentik", "sso", "identity-provider"]
 packages = [{ include = "imap_oidc_bridge" }]
 
