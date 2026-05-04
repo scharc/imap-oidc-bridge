@@ -136,6 +136,41 @@ The short version:
 - **Rate limiting:** not implemented. Front the bridge with CrowdSec, fail2ban,
   Cloudflare, or whatever your reverse proxy provides.
 
+## Decommissioning a user
+
+The bridge is stateless — it has no user table to prune. To remove a user
+from your stack you must delete them in **two places**, and the bridge
+handles neither:
+
+1. **At the IMAP server** — delete (or disable) the mailbox. The next
+   `IMAP LOGIN` will then fail and the bridge will return 401 to anyone
+   trying to authenticate. New tokens stop being issued.
+2. **At the OIDC consumer** (Authentik / Keycloak / your app) — delete or
+   disable the user record. This is what kills any *existing* session and
+   ensures a token still in flight can't be used to start a new one.
+
+Step 2 matters because tokens already issued by the bridge stay valid
+until `OIDC_TOKEN_TTL` expires (default 3600 s). The bridge has no
+revocation endpoint by design — short-lived tokens + active consumer-side
+deprovisioning are the right primitives, not stateful revocation lists.
+
+For tighter blast-radius:
+
+- **Lower the token TTL.** Set `OIDC_TOKEN_TTL=300` (5 min) or even `60`.
+  A deleted user is then locked out within that window even if the
+  consumer hasn't run its deprovisioning loop yet. Trades a bit of
+  re-auth churn for a much tighter window.
+- **Run a periodic sync.** A small cron that compares your OIDC
+  consumer's user list to the IMAP server's mailbox list, and disables
+  consumer users whose mailbox no longer exists. ~50 LoC, lives outside
+  the bridge. Not provided here — it's environment-specific.
+
+Order of operations when offboarding:
+delete the mailbox first, wait for any in-flight token to expire (or one
+TTL window), then delete the consumer user. Reverse order leaves a
+window where the user can still log in via the bridge but the consumer
+won't accept the new identity — confusing error messages.
+
 ## Limitations / roadmap
 
 - v0.1.0a1 (now): source-only — no prebuilt image is published. Build from

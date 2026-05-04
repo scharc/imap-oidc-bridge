@@ -104,6 +104,24 @@ on the application's policy bindings:
 
 **Applications → \<your app\> → Policy/Group/User Bindings → Add → Group Binding** → `imsteinig-members`.
 
+## Decommissioning a user
+
+The bridge is stateless — there is nothing on its side to remove. Two
+deletes, in this order:
+
+1. **Delete the mailbox at the IMAP server.** New `IMAP LOGIN` attempts
+   start failing immediately; no fresh tokens get minted.
+2. **Delete (or deactivate) the user in Authentik.** Kills any active
+   session and prevents an in-flight bridge token from being accepted on
+   the next `/userinfo` round-trip Authentik makes.
+
+Existing bridge tokens stay valid until `OIDC_TOKEN_TTL` expires
+(default 1 h). For a tighter window, set `OIDC_TOKEN_TTL=300` in the
+bridge env — 5-minute deletion-blast-radius, modest re-auth churn.
+
+See the README's [Decommissioning a user](../README.md#decommissioning-a-user)
+section for the full rationale.
+
 ## Troubleshooting
 
 - **HS256 / signing-key errors in Authentik logs:** the bridge always signs
