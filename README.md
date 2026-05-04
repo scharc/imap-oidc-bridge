@@ -6,11 +6,12 @@ built-in OIDC client — trust mailbox passwords as the source of truth, without
 running an LDAP shim and without giving the upstream consumer your IMAP
 credentials.
 
-> **Status:** v0.1.0a1 — alpha. Single-tenant, single-client, authorization
+> **Status:** v0.1.0a2 — alpha. Single-tenant, single-client, authorization
 > code flow only. No refresh tokens, no PKCE yet. Suitable for low-volume
 > self-hosted setups where the IMAP server is the existing user database.
-> Tested end-to-end against Authentik 2024.10 + Greenmail; not yet exercised
-> in production.
+> Tested end-to-end against Authentik 2024.10 + Greenmail and against
+> a real Mailcow with multi-account drives (concurrent + rolling rotation
+> + IMAP-down + broken-creds passes); soaking, not yet promoted to stable.
 
 ## Why
 
@@ -180,7 +181,7 @@ won't accept the new identity — confusing error messages.
 
 ## Limitations / roadmap
 
-- v0.1.0a1 (now): source-only — no prebuilt image is published. Build from
+- v0.1.0a2 (now): source-only — no prebuilt image is published. Build from
   the `Dockerfile` in your own environment.
 - v0.2: PKCE, refresh tokens, Hetzner-style autoconfig discovery.
 - v0.3: multi-client (so one container can serve multiple consumers).
