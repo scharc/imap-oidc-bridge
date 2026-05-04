@@ -14,11 +14,18 @@ credentials.
 
 ## Why
 
-You have a small group of users (a club, a team, a side project) whose
-credentials already live in an IMAP mailbox — for example a cheap shared
-webhosting tariff that gives you mail but no LDAP, no SCIM, and no API.
-You want to put SSO in front of WordPress, Nextcloud, or anything else that
-speaks OIDC, and you want one set of passwords.
+**Built for Hetzner Webhosting.** Hetzner's shared webhosting tariffs give
+you mailboxes but no LDAP, no SCIM, no API — not even an unofficial one.
+That makes them impossible to plug into Authentik or any other OIDC IdP
+through normal means. This bridge is the workaround: it speaks OIDC on
+the front and `IMAP LOGIN` on the back, so a club / team / side project
+on a €5/month Hetzner Webhosting plan can put SSO in front of WordPress,
+Nextcloud, or anything else that speaks OIDC, with the mail credentials
+the users already have.
+
+It works against any IMAP server — the design is generic — but Hetzner
+Webhosting is the original use case and what shapes the trade-offs (no
+batch user-creation, no group attributes, single-tenant container).
 
 This service does exactly one thing: when a user logs in, it does an `IMAP
 LOGIN` against your configured IMAP server. If that succeeds, it issues an
