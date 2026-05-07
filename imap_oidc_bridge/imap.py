@@ -11,7 +11,17 @@ log = structlog.get_logger(__name__)
 
 
 class IMAPAuthError(Exception):
-    """Raised when IMAP authentication fails for any reason."""
+    """Raised when IMAP authentication fails for any reason.
+
+    Carries a stable `code` (one of "empty_credentials", "invalid_credentials",
+    "upstream_unreachable", "upstream_error") so the caller can map to a
+    localized end-user message; the `Exception` arg keeps the human-readable
+    English fallback for logs and unbranded deployments.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(slots=True)
@@ -29,7 +39,7 @@ class IMAPBackend:
         trust the email the user typed.
         """
         if not email or not password:
-            raise IMAPAuthError("empty credentials")
+            raise IMAPAuthError("empty_credentials", "Email and password are required.")
 
         try:
             if self.ssl:
@@ -40,20 +50,27 @@ class IMAPBackend:
                 conn = imaplib.IMAP4(host=self.host, port=self.port, timeout=self.timeout)
         except (OSError, socket.gaierror) as exc:
             log.warning("imap.connect_failed", host=self.host, error=str(exc))
-            raise IMAPAuthError("upstream IMAP unreachable") from exc
+            raise IMAPAuthError(
+                "upstream_unreachable",
+                "Mail server is currently unreachable. Please try again.",
+            ) from exc
 
         try:
             try:
                 conn.login(email, password)
             except imaplib.IMAP4.error as exc:
                 log.info("imap.login_rejected", email=email, error=str(exc))
-                raise IMAPAuthError("invalid credentials") from exc
+                raise IMAPAuthError(
+                    "invalid_credentials", "Invalid email or password."
+                ) from exc
             except (TimeoutError, OSError) as exc:
                 # Socket dropped / SSL read timed out / connection reset mid-LOGIN.
                 # Without this clause the bare exception escapes the request handler
                 # and the consumer sees a 500 — fail closed visibly with a 401 instead.
                 log.warning("imap.login_transport_error", email=email, error=str(exc))
-                raise IMAPAuthError("upstream IMAP error") from exc
+                raise IMAPAuthError(
+                    "upstream_error", "Mail server returned an error."
+                ) from exc
         finally:
             with contextlib.suppress(Exception):
                 conn.logout()

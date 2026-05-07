@@ -89,11 +89,33 @@ class Settings(BaseSettings):
     # Per-string overrides — lighter than full i18n. Operators who want German
     # set BRAND_LABEL_EMAIL=E-Mail etc. without dragging in a translation
     # framework. Defaults stay English.
+    brand_lang: str = Field(
+        "en",
+        description="Sets the <html lang> attribute (BCP 47, e.g. 'de').",
+    )
     brand_label_email: str = Field("Email")
     brand_label_password: str = Field("Password")
     brand_label_submit: str = Field("Sign in")
     brand_label_submitting: str = Field("Signing in…")
     brand_placeholder_email: str = Field("you@example.com")
+    brand_aria_footer_links: str = Field(
+        "Site links",
+        description="ARIA label for the footer-links nav (screen-reader text).",
+    )
+
+    # Error messages shown in the red banner under the form. Mapped from
+    # IMAPAuthError.code → BRAND_ERROR_<CODE>.
+    brand_error_empty_credentials: str = Field("Email and password are required.")
+    brand_error_invalid_credentials: str = Field("Invalid email or password.")
+    brand_error_upstream_unreachable: str = Field(
+        "Mail server is currently unreachable. Please try again."
+    )
+    brand_error_upstream_error: str = Field("Mail server returned an error.")
+
+    def localized_error(self, code: str, fallback: str) -> str:
+        """Return the operator-overridden error string for an IMAPAuthError code."""
+        attr = f"brand_error_{code}"
+        return getattr(self, attr, None) or fallback
 
     @property
     def issuer(self) -> str:

@@ -85,7 +85,7 @@ def test_invalid_imap_credentials_rerender_form(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert resp.status_code == 401
-    assert "invalid credentials" in resp.text
+    assert "Invalid email or password." in resp.text
 
 
 def test_unknown_redirect_uri_rejected(client: TestClient) -> None:

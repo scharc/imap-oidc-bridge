@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang|default('en') }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -247,7 +247,7 @@
       {% endif %}
 
       {% if footer_links %}
-        <nav class="footer-links" aria-label="Site links">
+        <nav class="footer-links" aria-label="{{ aria_footer_links }}">
           {% for link in footer_links -%}
             <a href="{{ link.href }}" rel="noopener">{{ link.label }}</a>
           {%- endfor %}

@@ -6,7 +6,7 @@ built-in OIDC client — trust mailbox passwords as the source of truth, without
 running an LDAP shim and without giving the upstream consumer your IMAP
 credentials.
 
-> **Status:** v0.2.0 — alpha. Single-tenant, single-client, authorization
+> **Status:** v0.2.1 — alpha. Single-tenant, single-client, authorization
 > code flow only. No refresh tokens, no PKCE yet. Suitable for low-volume
 > self-hosted setups where the IMAP server is the existing user database.
 > Tested end-to-end against Authentik 2024.10 + Greenmail and against
@@ -163,17 +163,24 @@ cycle.
 For any deployment that needs labels in another language, override individual
 strings rather than dragging in a translation framework. Defaults are English.
 
-| Variable                  | Default            |
-| ------------------------- | ------------------ |
-| `BRAND_LABEL_EMAIL`       | `Email`            |
-| `BRAND_LABEL_PASSWORD`    | `Password`         |
-| `BRAND_LABEL_SUBMIT`      | `Sign in`          |
-| `BRAND_LABEL_SUBMITTING`  | `Signing in…`      |
-| `BRAND_PLACEHOLDER_EMAIL` | `you@example.com`  |
+| Variable                       | Default                                                       |
+| ------------------------------ | ------------------------------------------------------------- |
+| `BRAND_LANG`                   | `en` (sets `<html lang>` for screen readers + browser locale) |
+| `BRAND_LABEL_EMAIL`            | `Email`                                                       |
+| `BRAND_LABEL_PASSWORD`         | `Password`                                                    |
+| `BRAND_LABEL_SUBMIT`           | `Sign in`                                                     |
+| `BRAND_LABEL_SUBMITTING`       | `Signing in…`                                                 |
+| `BRAND_PLACEHOLDER_EMAIL`      | `you@example.com`                                             |
+| `BRAND_ARIA_FOOTER_LINKS`      | `Site links` (screen-reader label for the footer-links nav)   |
+| `BRAND_ERROR_EMPTY_CREDENTIALS`    | `Email and password are required.`                        |
+| `BRAND_ERROR_INVALID_CREDENTIALS`  | `Invalid email or password.`                              |
+| `BRAND_ERROR_UPSTREAM_UNREACHABLE` | `Mail server is currently unreachable. Please try again.` |
+| `BRAND_ERROR_UPSTREAM_ERROR`       | `Mail server returned an error.`                          |
 
-For German, set `BRAND_TITLE=Anmelden`, `BRAND_LABEL_EMAIL=E-Mail`,
+For German, set `BRAND_LANG=de`, `BRAND_TITLE=Anmelden`, `BRAND_LABEL_EMAIL=E-Mail`,
 `BRAND_LABEL_PASSWORD=Passwort`, `BRAND_LABEL_SUBMIT=Anmelden`,
-`BRAND_LABEL_SUBMITTING=Anmelden…` — and the form is fully localized.
+`BRAND_LABEL_SUBMITTING=Anmelden…`, plus the four `BRAND_ERROR_*` strings —
+and the form is fully localized including the IMAP-failure banner.
 
 #### Worked example
 
@@ -272,11 +279,12 @@ won't accept the new identity — confusing error messages.
 
 ## Limitations / roadmap
 
-- v0.2.0 (now): source-only — no prebuilt image is published. Build from
+- v0.2.1 (now): source-only — no prebuilt image is published. Build from
   the `Dockerfile` in your own environment. Login-form branding: logo,
   HTML content slots (header / below-form / footer), structured footer
   links (Impressum etc.), accent color, optional background image, per-
-  string overrides for any-language deployments.
+  string overrides + per-error overrides for any-language deployments
+  (`<html lang>` + IMAP-error banner translations included).
 - v0.3: PKCE, refresh tokens, Hetzner-style autoconfig discovery.
 - v0.4: multi-client (so one container can serve multiple consumers).
 - v0.5: optional groups via a static membership map, for "all imap users → group X" without Authentik policies.

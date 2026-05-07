@@ -67,14 +67,16 @@ def test_verify_success(patched: dict[str, Any]) -> None:
 
 def test_verify_login_rejected(patched: dict[str, Any]) -> None:
     patched["conn"] = FakeConn(login_ok=False)
-    with pytest.raises(IMAPAuthError, match="invalid credentials"):
+    with pytest.raises(IMAPAuthError, match="Invalid email") as ei:
         IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert ei.value.code == "invalid_credentials"
 
 
 def test_verify_connection_failure(patched: dict[str, Any]) -> None:
     patched["connect_raises"] = OSError("connection refused")
-    with pytest.raises(IMAPAuthError, match="upstream IMAP unreachable"):
+    with pytest.raises(IMAPAuthError, match="unreachable") as ei:
         IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert ei.value.code == "upstream_unreachable"
 
 
 def test_verify_dns_failure(patched: dict[str, Any]) -> None:
@@ -85,9 +87,10 @@ def test_verify_dns_failure(patched: dict[str, Any]) -> None:
 
 def test_verify_empty_credentials_short_circuit() -> None:
     backend = IMAPBackend(host="mail.x")
-    with pytest.raises(IMAPAuthError, match="empty"):
+    with pytest.raises(IMAPAuthError, match="required") as ei:
         backend.verify("", "pw")
-    with pytest.raises(IMAPAuthError, match="empty"):
+    assert ei.value.code == "empty_credentials"
+    with pytest.raises(IMAPAuthError, match="required"):
         backend.verify("u@x", "")
 
 
@@ -127,8 +130,9 @@ def test_login_timeout_returns_authn_error_not_500(patched: dict[str, Any]) -> N
     """
     conn = FakeConn(login_raises=TimeoutError("The read operation timed out"))
     patched["conn"] = conn
-    with pytest.raises(IMAPAuthError, match="upstream IMAP error"):
+    with pytest.raises(IMAPAuthError, match="returned an error") as ei:
         IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert ei.value.code == "upstream_error"
     assert conn.logout_called is True
 
 
@@ -136,6 +140,7 @@ def test_login_connection_reset_returns_authn_error(patched: dict[str, Any]) -> 
     """Mid-LOGIN socket drop (ConnectionResetError is OSError) → IMAPAuthError."""
     conn = FakeConn(login_raises=ConnectionResetError("Connection reset by peer"))
     patched["conn"] = conn
-    with pytest.raises(IMAPAuthError, match="upstream IMAP error"):
+    with pytest.raises(IMAPAuthError, match="returned an error") as ei:
         IMAPBackend(host="mail.x").verify("u@x", "pw")
+    assert ei.value.code == "upstream_error"
     assert conn.logout_called is True

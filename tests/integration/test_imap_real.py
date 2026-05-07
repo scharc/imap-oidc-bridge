@@ -51,7 +51,7 @@ def test_real_imap_unreachable_host_times_out_quickly() -> None:
     """A wrong port should fail fast, not hang for the OS default. No greenmail needed."""
     backend = IMAPBackend(host="127.0.0.1", port=1, ssl=False, timeout=2.0)
     started = time.monotonic()
-    with pytest.raises(IMAPAuthError, match="upstream"):
+    with pytest.raises(IMAPAuthError, match="unreachable"):
         backend.verify("u@x", "pw")
     assert time.monotonic() - started < 5.0
 
@@ -60,7 +60,7 @@ def test_real_imap_empty_credentials_short_circuit() -> None:
     """No greenmail needed — must fail before opening a socket."""
     backend = IMAPBackend(host="127.0.0.1", port=1, ssl=False, timeout=2.0)
     started = time.monotonic()
-    with pytest.raises(IMAPAuthError, match="empty"):
+    with pytest.raises(IMAPAuthError, match="required"):
         backend.verify("", "pw")
     # If we'd actually opened a socket to :1 it would have taken a connect-refused round-trip.
     assert time.monotonic() - started < 0.5

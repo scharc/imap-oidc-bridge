@@ -22,7 +22,7 @@ class FakeIMAP:
     def verify(self, email: str, password: str) -> None:
         self.calls.append((email, password))
         if self.valid.get(email) != password:
-            raise IMAPAuthError("invalid credentials")
+            raise IMAPAuthError("invalid_credentials", "Invalid email or password.")
 
 
 @pytest.fixture

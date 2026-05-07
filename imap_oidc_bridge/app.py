@@ -60,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def _brand_context() -> dict[str, object]:
         """Static brand fields fed to the login template — one source of truth."""
         return {
+            "lang": settings.brand_lang,
             "title": settings.brand_title,
             "subtext": settings.brand_subtext,
             "logo_url": settings.brand_logo_url,
@@ -74,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "label_submit": settings.brand_label_submit,
             "label_submitting": settings.brand_label_submitting,
             "placeholder_email": settings.brand_placeholder_email,
+            "aria_footer_links": settings.brand_aria_footer_links,
         }
 
     app = FastAPI(title="imap-oidc-bridge", version=__version__)
@@ -156,7 +158,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     **_brand_context(),
                     "form_action": "/authorize",
                     "request_id": request_id,
-                    "error": str(exc),
+                    "error": settings.localized_error(exc.code, str(exc)),
                     "email": email,
                 },
                 status_code=401,
