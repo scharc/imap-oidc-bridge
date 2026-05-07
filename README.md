@@ -6,7 +6,7 @@ built-in OIDC client — trust mailbox passwords as the source of truth, without
 running an LDAP shim and without giving the upstream consumer your IMAP
 credentials.
 
-> **Status:** v0.1.0a2 — alpha. Single-tenant, single-client, authorization
+> **Status:** v0.1.0a3 — alpha. Single-tenant, single-client, authorization
 > code flow only. No refresh tokens, no PKCE yet. Suitable for low-volume
 > self-hosted setups where the IMAP server is the existing user database.
 > Tested end-to-end against Authentik 2024.10 + Greenmail and against
@@ -100,6 +100,19 @@ All config is environment variables (see [`.env.example`](./.env.example)):
 | `SESSION_SECRET`      | yes      | Long random string for signing the in-flight auth state        |
 | `LOG_LEVEL`           | no (INFO)| Python log level                                               |
 | `BIND_HOST` / `BIND_PORT` | no   | Uvicorn bind                                                    |
+| `BRAND_LOGO_URL`      | no       | URL of an SVG/PNG shown above the login form                   |
+| `BRAND_TITLE`         | no (Sign in) | Heading on the login form                                  |
+| `BRAND_SUBTEXT`       | no       | One-line hint under the heading (e.g. *"Use your imsteinig.de mailbox."*) |
+
+### Branding the login form
+
+The form ships in a deliberately neutral default style and pulls no external
+assets — fonts come from the OS, colors switch automatically with
+`prefers-color-scheme`, and there is no logo unless you point at one. To
+brand it for your tenant, set the three `BRAND_*` env vars above. The logo
+URL is rendered as-is in an `<img>` tag, so any externally-hosted SVG/PNG
+works (a wordmark generator service, a static `assets/` route on the same
+reverse proxy, etc.).
 
 ## Wiring it into Authentik
 
@@ -181,8 +194,8 @@ won't accept the new identity — confusing error messages.
 
 ## Limitations / roadmap
 
-- v0.1.0a2 (now): source-only — no prebuilt image is published. Build from
-  the `Dockerfile` in your own environment.
+- v0.1.0a3 (now): source-only — no prebuilt image is published. Build from
+  the `Dockerfile` in your own environment. Branded login form added.
 - v0.2: PKCE, refresh tokens, Hetzner-style autoconfig discovery.
 - v0.3: multi-client (so one container can serve multiple consumers).
 - v0.4: optional groups via a static membership map, for "all imap users → group X" without Authentik policies.

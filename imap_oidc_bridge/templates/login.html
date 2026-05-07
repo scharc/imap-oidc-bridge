@@ -3,35 +3,209 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
     <title>{{ title }}</title>
     <style>
-      :root { color-scheme: light dark; }
-      body { font-family: system-ui, sans-serif; max-width: 24rem; margin: 4rem auto; padding: 0 1rem; }
-      h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
-      p.hint { color: #666; margin-top: 0; font-size: 0.9rem; }
-      form { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
-      label { font-size: 0.85rem; }
-      input { padding: 0.5rem; font-size: 1rem; border: 1px solid #888; border-radius: 4px; }
-      button { padding: 0.5rem; font-size: 1rem; border: 0; border-radius: 4px; background: #2563eb; color: white; cursor: pointer; }
-      button:hover { background: #1d4ed8; }
-      .error { color: #b91c1c; font-size: 0.9rem; margin-top: 1rem; }
+      :root {
+        --bg: #f5f6f8;
+        --card: #ffffff;
+        --fg: #0f172a;
+        --muted: #64748b;
+        --border: #d4d4d8;
+        --border-strong: #94a3b8;
+        --input-bg: #ffffff;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --accent-active: #1e40af;
+        --error-bg: #fef2f2;
+        --error-fg: #b91c1c;
+        --error-border: #fecaca;
+        --focus-ring: rgba(37, 99, 235, 0.35);
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.08);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0f1a;
+          --card: #111827;
+          --fg: #e5e7eb;
+          --muted: #94a3b8;
+          --border: #1f2937;
+          --border-strong: #374151;
+          --input-bg: #0f172a;
+          --accent: #3b82f6;
+          --accent-hover: #60a5fa;
+          --accent-active: #2563eb;
+          --error-bg: #2a1010;
+          --error-fg: #fca5a5;
+          --error-border: #5b1d1d;
+          --focus-ring: rgba(59, 130, 246, 0.45);
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      .card {
+        width: 100%;
+        max-width: 26rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        padding: 2rem 1.75rem 1.75rem;
+      }
+      .logo {
+        display: block;
+        margin: 0 auto 1.25rem;
+        max-width: 100%;
+        max-height: 4.5rem;
+        height: auto;
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .hint {
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      form { display: grid; gap: 0.9rem; }
+      label {
+        display: grid;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      input {
+        font: inherit;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--fg);
+        transition: border-color 120ms ease, box-shadow 120ms ease;
+      }
+      input::placeholder { color: var(--muted); opacity: 0.6; }
+      input:hover { border-color: var(--accent); }
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--focus-ring);
+      }
+      input:autofill, input:-webkit-autofill {
+        -webkit-text-fill-color: var(--fg);
+        -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset;
+      }
+      button {
+        margin-top: 0.5rem;
+        padding: 0.65rem 1rem;
+        font: inherit;
+        font-weight: 600;
+        color: white;
+        background: var(--accent);
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 120ms ease, transform 60ms ease, box-shadow 120ms ease;
+      }
+      button:hover { background: var(--accent-hover); }
+      button:active { background: var(--accent-active); transform: translateY(1px); }
+      button:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--focus-ring);
+      }
+      button[disabled] { opacity: 0.7; cursor: progress; }
+      .error {
+        margin: 1rem 0 0;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid var(--error-border);
+        background: var(--error-bg);
+        color: var(--error-fg);
+        border-radius: 8px;
+        font-size: 0.9rem;
+      }
+      .footer {
+        margin: 1.25rem 0 0;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .footer a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+      @media (max-width: 380px) {
+        .card { padding: 1.5rem 1.25rem 1.25rem; border-radius: 12px; }
+      }
     </style>
   </head>
   <body>
-    <h1>{{ title }}</h1>
-    <p class="hint">Sign in with your mailbox credentials.</p>
-    <form method="post" action="{{ form_action }}">
-      <input type="hidden" name="request_id" value="{{ request_id }}" />
-      <label>
-        Email
-        <input type="email" name="email" autocomplete="username" required autofocus value="{{ email }}" />
-      </label>
-      <label>
-        Password
-        <input type="password" name="password" autocomplete="current-password" required />
-      </label>
-      <button type="submit">Sign in</button>
-    </form>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <main class="card" role="main">
+      {% if logo_url %}
+        <img class="logo" src="{{ logo_url }}" alt="" aria-hidden="true" />
+      {% endif %}
+      <h1>{{ title }}</h1>
+      <p class="hint">{{ subtext }}</p>
+
+      <form method="post" action="{{ form_action }}" id="login-form" novalidate>
+        <input type="hidden" name="request_id" value="{{ request_id }}" />
+        <label>
+          Email
+          <input
+            type="email"
+            name="email"
+            autocomplete="username"
+            inputmode="email"
+            spellcheck="false"
+            autocapitalize="none"
+            placeholder="you@example.com"
+            required
+            autofocus
+            value="{{ email }}"
+          />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+          />
+        </label>
+        <button type="submit" id="submit-btn">Sign in</button>
+      </form>
+
+      {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+      <p class="footer">Authenticated via IMAP. Your password is not stored.</p>
+    </main>
+    <script>
+      // Disable the button on submit so a slow IMAP round-trip doesn't get
+      // hammered with duplicate clicks. Idempotent — form still posts normally.
+      (function () {
+        var f = document.getElementById('login-form');
+        var b = document.getElementById('submit-btn');
+        if (!f || !b) return;
+        f.addEventListener('submit', function () {
+          b.disabled = true;
+          b.textContent = 'Signing in…';
+        });
+      })();
+    </script>
   </body>
 </html>

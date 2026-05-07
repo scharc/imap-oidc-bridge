@@ -106,7 +106,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request,
             "login.html",
             {
-                "title": "Sign in",
+                "title": settings.brand_title,
+                "subtext": settings.brand_subtext,
+                "logo_url": settings.brand_logo_url,
                 "form_action": "/authorize",
                 "request_id": pending,
                 "error": None,
@@ -134,7 +136,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 request,
                 "login.html",
                 {
-                    "title": "Sign in",
+                    "title": settings.brand_title,
+                    "subtext": settings.brand_subtext,
+                    "logo_url": settings.brand_logo_url,
                     "form_action": "/authorize",
                     "request_id": request_id,
                     "error": str(exc),

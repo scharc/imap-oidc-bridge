@@ -41,6 +41,19 @@ class Settings(BaseSettings):
     bind_host: str = Field("0.0.0.0", description="Uvicorn bind host")
     bind_port: int = Field(8000, description="Uvicorn bind port")
 
+    brand_logo_url: str | None = Field(
+        None,
+        description="Optional URL of an SVG/PNG shown above the login form (e.g. a wordmark).",
+    )
+    brand_title: str = Field(
+        "Sign in",
+        description="Heading shown on the login form.",
+    )
+    brand_subtext: str = Field(
+        "Sign in with your mailbox credentials.",
+        description="Hint text shown under the heading.",
+    )
+
     @property
     def issuer(self) -> str:
         return str(self.oidc_issuer).rstrip("/")
