@@ -1,8 +1,17 @@
 # Production-shape Authentik blueprint that wires the bridge end-to-end:
-#   1. an OAuth source pointing at imap-oidc-bridge
-#   2. a group that bridge-authenticated users belong to
-#   3. an OIDC provider for an example downstream application (Nextcloud)
-#   4. the Application + group binding so only bridge users can reach it
+#   1. a group that bridge-authenticated users belong to
+#   2. an OAuth source pointing at imap-oidc-bridge
+#   3. a per-tenant Identification stage (single-source, auto-redirect)
+#   4. a per-tenant Authentication flow that uses the stage above
+#   5. an OIDC provider for an example downstream application (Nextcloud)
+#      bound to the per-tenant flow as its authentication_flow
+#   6. the Application + group binding so only bridge users can reach it
+#
+# The §3 + §4 combo is what makes the end-user UX zero-click: instead of
+# landing on Authentik's default Email/Password form (which always fails
+# for federated users since they have no Authentik password), the user
+# is auto-redirected to the bridge's mailbox-credentials form. See
+# docs/authentik-setup.md §5 for the rationale.
 #
 # Drop this file into Authentik's /blueprints/custom/ mount, edit the
 # placeholders below, then restart the worker (or wait for the discovery
@@ -37,7 +46,8 @@ entries:
   #    Authentik will fetch the discovery doc on save; the bridge must
   #    be reachable from the Authentik server + worker containers.
   # ---------------------------------------------------------------------
-  - identifiers:
+  - id: imap-bridge-source
+    identifiers:
       slug: imap-bridge
     model: authentik_sources_oauth.oauthsource
     attrs:
@@ -54,9 +64,68 @@ entries:
         !Find [authentik_flows.flow, [slug, default-source-enrollment]]
 
   # ---------------------------------------------------------------------
-  # 3. An OIDC provider for one example downstream app (Nextcloud here,
+  # 3. Per-tenant Identification stage: empty user_fields + single source
+  #    causes Authentik to AUTO-REDIRECT to the bridge — no Email/Password
+  #    form, no source-button intermediate page. This is the key piece
+  #    that makes federated-user login work cleanly.
+  # ---------------------------------------------------------------------
+  - identifiers:
+      name: tenant-authentication-identification
+    model: authentik_stages_identification.identificationstage
+    attrs:
+      user_fields: []
+      sources:
+        - !KeyOf imap-bridge-source
+      show_source_labels: true
+      pretend_user_exists: false
+      case_insensitive_matching: true
+      # No password_stage — federated users have no Authentik password.
+
+  # ---------------------------------------------------------------------
+  # 4. Per-tenant Authentication flow: the identification stage above
+  #    plus the built-in user-login stage. Bind this as the
+  #    authentication_flow on each tenant service's OIDC provider so
+  #    that hitting the service's OIDC handshake auto-redirects to the
+  #    bridge.
+  # ---------------------------------------------------------------------
+  - id: tenant-flow
+    identifiers:
+      slug: tenant-authentication-flow
+    model: authentik_flows.flow
+    attrs:
+      name: tenant-authentication-flow
+      title: Welcome
+      designation: authentication
+      authentication: none
+      policy_engine_mode: any
+
+  - identifiers:
+      target: !KeyOf tenant-flow
+      stage:
+        !Find [authentik_stages_identification.identificationstage,
+               [name, tenant-authentication-identification]]
+      order: 10
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+
+  - identifiers:
+      target: !KeyOf tenant-flow
+      stage:
+        !Find [authentik_stages_user_login.userloginstage,
+               [name, default-authentication-login]]
+      order: 30
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+
+  # ---------------------------------------------------------------------
+  # 5. An OIDC provider for one example downstream app (Nextcloud here,
   #    swap for whatever you're protecting). The redirect URI must match
-  #    what the app is configured with.
+  #    what the app is configured with. Bound to the tenant flow above
+  #    via authentication_flow — that's what triggers the auto-redirect.
   # ---------------------------------------------------------------------
   - id: cloud-provider
     identifiers:
@@ -71,6 +140,7 @@ entries:
           url: https://cloud.example.com/apps/oidc_login/oidc
       signing_key:
         !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+      authentication_flow: !KeyOf tenant-flow
       authorization_flow:
         !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
       property_mappings:
@@ -79,7 +149,7 @@ entries:
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
 
   # ---------------------------------------------------------------------
-  # 4. The application surface in Authentik's user UI + the access
+  # 6. The application surface in Authentik's user UI + the access
   #    binding that restricts it to bridge-authenticated users.
   # ---------------------------------------------------------------------
   - identifiers:

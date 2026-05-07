@@ -80,20 +80,164 @@ user enrolled via this source to a fixed group (e.g. `imsteinig-members`).
 
 Alternatively, do it manually for the first few users and skip the policy.
 
-## 5. Add the source to a Brand (optional)
+## 5. Per-tenant auto-redirect (recommended for multi-tenant setups)
 
-If this bridge serves a separate tenant (e.g. `sso.imsteinig.de`), create a
-Brand for that hostname and pin the source to it so users on the main brand
-don't see it on their login page.
+Steps 1–4 above wire the source so it appears as a "Sign in with …" button
+on Authentik's default login form. For multi-tenant deployments — where
+the same Authentik serves operators, other tenants, and the bridge users
+side by side — that surface gets crowded fast, and federated users
+(whose only credential is the IMAP password) face a confusing Email/Password
+form that *always fails* for them, with the source button as a secondary
+action they have to discover.
+
+A **per-tenant authentication flow** with one Identification stage
+configured `user_fields=[]` + this bridge as the single source causes
+Authentik to **auto-redirect** to the bridge: zero buttons, zero clicks.
+End users on the tenant's apps land directly on the bridge's mailbox
+login page; other users (operators, other tenants) keep using the default
+flow unchanged.
+
+### Set it up (admin UI)
+
+1. **Flows & Stages → Stages → Create → Identification Stage**
+
+   | Field                         | Value                                              |
+   | ----------------------------- | -------------------------------------------------- |
+   | Name                          | `<tenant>-authentication-identification`           |
+   | User fields                   | *(none — leave the list empty)*                    |
+   | Sources                       | the OAuth source you created in §2                 |
+   | Show source labels            | *(any — irrelevant when user_fields is empty)*     |
+   | Password stage                | *(none)*                                           |
+   | Pretend user exists           | *(off)*                                            |
+
+2. **Flows & Stages → Flows → Create → Flow**
+
+   | Field           | Value                                |
+   | --------------- | ------------------------------------ |
+   | Name            | `<tenant>-authentication-flow`       |
+   | Slug            | `<tenant>-authentication-flow`       |
+   | Title           | something user-friendly              |
+   | Designation     | Authentication                       |
+   | Authentication  | None (form is reachable unauth'd)    |
+
+3. **On the new flow → Stage Bindings → Create**
+
+   | Order | Stage                                            |
+   | ----- | ------------------------------------------------ |
+   | 10    | `<tenant>-authentication-identification` (from §1) |
+   | 30    | `default-authentication-login` (the built-in user-login stage) |
+
+4. **For each tenant service's OIDC Provider** (Applications → Providers
+   → edit) — set the **Authentication flow** field to the new
+   `<tenant>-authentication-flow`. (Leave **Authorization flow** as your
+   existing consent flow.)
+
+That's it. Test by visiting one of the tenant apps in a private window —
+the OIDC handshake should land directly on the bridge's login form
+without any Authentik UI in between.
+
+### Set it up (REST API, scriptable)
+
+For ops-as-code or when scaling to many tenants. Replace `<TOKEN>`,
+`<TENANT>`, `<SOURCE_PK>` (your `imap-bridge` source's pk), and the
+provider pks at the bottom.
+
+```bash
+TOKEN='<your-Authentik-API-token>'
+BASE='https://sso.example.com/api/v3'
+
+# 1. Identification stage (single source, no user input)
+STAGE_PK=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  "$BASE/stages/identification/" \
+  -d '{
+    "name": "<TENANT>-authentication-identification",
+    "user_fields": [],
+    "password_stage": null,
+    "sources": ["<SOURCE_PK>"],
+    "show_source_labels": true,
+    "pretend_user_exists": false
+  }' | jq -r .pk)
+
+# 2. The flow itself
+FLOW_PK=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  "$BASE/flows/instances/" \
+  -d '{
+    "name": "<TENANT>-authentication-flow",
+    "slug": "<TENANT>-authentication-flow",
+    "title": "Welcome to <TENANT>",
+    "designation": "authentication",
+    "authentication": "none",
+    "policy_engine_mode": "any"
+  }' | jq -r .pk)
+
+# 3. Bind identification @ order 10
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  "$BASE/flows/bindings/" \
+  -d "{\"target\":\"$FLOW_PK\",\"stage\":\"$STAGE_PK\",\"order\":10,\"evaluate_on_plan\":true}"
+
+# 4. Bind built-in user-login @ order 30
+USER_LOGIN_PK=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$BASE/stages/user_login/?name=default-authentication-login" \
+  | jq -r '.results[0].pk')
+
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  "$BASE/flows/bindings/" \
+  -d "{\"target\":\"$FLOW_PK\",\"stage\":\"$USER_LOGIN_PK\",\"order\":30,\"evaluate_on_plan\":true}"
+
+# 5. Repoint each tenant-service OIDC provider's authentication_flow
+for PROVIDER_PK in 28 29 30 31; do
+  curl -s -X PATCH -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    "$BASE/providers/oauth2/$PROVIDER_PK/" \
+    -d "{\"authentication_flow\":\"$FLOW_PK\"}"
+done
+```
+
+### Set it up (declarative blueprint)
+
+The full pattern is encoded in
+[`examples/authentik-blueprint.yaml`](../examples/authentik-blueprint.yaml).
+Drop it into Authentik's `/blueprints/custom/` mount and the source +
+identification stage + flow + bindings + provider re-pointing are all
+upserted on the next worker tick.
+
+### Caveats
+
+- This flow has **no fallback**: a user who lands on it can only sign in
+  via the bridge. That's intentional for tenant apps but means you
+  shouldn't bind it as a brand-default flow for any host that operators
+  use to log into Authentik itself.
+- When the IMAP server is down, end users see the bridge's error banner
+  (override the strings via the bridge's `BRAND_ERROR_*` env vars). The
+  bridge fails closed with a 401 to Authentik rather than 500, so
+  Authentik's own error pages don't surface — the user stays on the
+  bridge's branded form, sees the localized error, and can retry.
+- Multiple sources on one tenant flow → Authentik shows source buttons
+  instead of auto-redirecting. Keep `sources=[<one>]` to preserve the
+  zero-click behavior. Want a tenant with both bridge auth and an
+  external OAuth (Google etc.)? That's a different UX choice — list both
+  and accept the button-page intermediate.
+
+## 6. (Optional) Pin the bridge source to a separate Brand
+
+If this bridge serves a tenant that should also have its own Authentik
+hostname (e.g. `sso.imsteinig.de` instead of the operator's
+`sso.example.com`), create a Brand for that hostname:
 
 **System → Brands → Create**:
 - Domain: `sso.imsteinig.de`
 - Default flow background, default UI settings as desired.
 
 Then on the OAuth source, restrict it to the Brand under
-**Source settings → Available for**.
+**Source settings → Available for**. Combined with §5's per-tenant flow,
+this gives full per-tenant isolation: each tenant has its own login URL,
+its own flow, its own brand.
 
-## 6. Wire an application
+## 7. Wire an application
 
 Create an application (e.g. WordPress) with an OIDC provider as usual; the
 fact that users sign in via the IMAP bridge is invisible to the app — they

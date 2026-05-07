@@ -224,6 +224,32 @@ The short version:
 4. Bind any application's access policy to a group, then assign newly
    enrolled users to that group via a group-membership policy on enrollment.
 
+### Auto-redirect (recommended for tenant deployments)
+
+Steps 1–4 above wire the source up so it appears as a "Sign in with …"
+button on Authentik's default login form. That works, but mixes tenant
+buttons into the global login UI — and federated users (whose only
+credential is their IMAP password) get a confusing Email/Password form
+that always fails for them, with the source button as the *secondary*
+action.
+
+For tenant deployments, create a **per-tenant authentication flow** with
+one Identification stage configured `user_fields=[]` + the bridge as its
+single source. Authentik treats this combo as "single-source-only" and
+**auto-redirects** to the bridge — zero buttons, zero clicks. Then bind
+that flow as the `authentication_flow` on each tenant service's OIDC
+provider.
+
+End-user UX becomes: visit `cloud.tenant.example` → straight to the
+bridge's "Sign in with your mailbox credentials" form, no intermediate
+page. Other Authentik users (operators, other tenants) keep using the
+default flow unchanged.
+
+See [`docs/authentik-setup.md`](./docs/authentik-setup.md) §
+"Per-tenant auto-redirect (recommended for multi-tenant setups)" for the
+walkthrough, and [`examples/authentik-blueprint.yaml`](./examples/authentik-blueprint.yaml)
+for the declarative version.
+
 ## Security model
 
 - **Trust boundary:** the bridge speaks for whatever email the IMAP server
