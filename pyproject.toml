@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "imap-oidc-bridge"
-version = "0.1.0a3"
+version = "0.2.0"
 description = "Tiny OIDC identity provider that authenticates against an IMAP server. Lets any OIDC consumer (Authentik, Keycloak, Dex, etc.) trust mailbox passwords as the source of truth."
 authors = ["Marc Schuetze <agent-provocateur@zkm.de>"]
 license = "MIT"

@@ -6,7 +6,7 @@ built-in OIDC client — trust mailbox passwords as the source of truth, without
 running an LDAP shim and without giving the upstream consumer your IMAP
 credentials.
 
-> **Status:** v0.1.0a3 — alpha. Single-tenant, single-client, authorization
+> **Status:** v0.2.0 — alpha. Single-tenant, single-client, authorization
 > code flow only. No refresh tokens, no PKCE yet. Suitable for low-volume
 > self-hosted setups where the IMAP server is the existing user database.
 > Tested end-to-end against Authentik 2024.10 + Greenmail and against
@@ -100,19 +100,97 @@ All config is environment variables (see [`.env.example`](./.env.example)):
 | `SESSION_SECRET`      | yes      | Long random string for signing the in-flight auth state        |
 | `LOG_LEVEL`           | no (INFO)| Python log level                                               |
 | `BIND_HOST` / `BIND_PORT` | no   | Uvicorn bind                                                    |
-| `BRAND_LOGO_URL`      | no       | URL of an SVG/PNG shown above the login form                   |
-| `BRAND_TITLE`         | no (Sign in) | Heading on the login form                                  |
-| `BRAND_SUBTEXT`       | no       | One-line hint under the heading (e.g. *"Use your imsteinig.de mailbox."*) |
 
 ### Branding the login form
 
-The form ships in a deliberately neutral default style and pulls no external
-assets — fonts come from the OS, colors switch automatically with
-`prefers-color-scheme`, and there is no logo unless you point at one. To
-brand it for your tenant, set the three `BRAND_*` env vars above. The logo
-URL is rendered as-is in an `<img>` tag, so any externally-hosted SVG/PNG
-works (a wordmark generator service, a static `assets/` route on the same
-reverse proxy, etc.).
+The form is the **front door for every user** of a deployment, so it needs to
+look like part of the tenant's stack. It ships with neutral defaults and pulls
+no external assets unless you opt in — fonts come from the OS, colors switch
+automatically with `prefers-color-scheme`, and there is no logo or footer
+unless you set one.
+
+All branding is opt-in via environment variables. Defaults shown below in
+parentheses; everything is optional.
+
+#### Identity
+
+| Variable          | Default       | Use                                                        |
+| ----------------- | ------------- | ---------------------------------------------------------- |
+| `BRAND_LOGO_URL`  | *(none)*      | URL of an SVG/PNG shown above the form (a wordmark works). |
+| `BRAND_TITLE`     | `Sign in`     | Heading text.                                              |
+| `BRAND_SUBTEXT`   | *(generic)*   | One-line hint under the heading.                           |
+
+#### Free-HTML content slots
+
+Three slots let you inject arbitrary HTML at three positions in the form.
+Content is rendered verbatim (operator-supplied = trusted), so you can
+include `<a>`, `<strong>`, inline SVG, etc. — anything safe in your tenant
+context.
+
+| Variable                | Position                                                      |
+| ----------------------- | ------------------------------------------------------------- |
+| `BRAND_HEADER_HTML`     | Above the card (welcome banner, alert, club name).            |
+| `BRAND_BELOW_FORM_HTML` | Between the submit button and the footer (help text, links).  |
+| `BRAND_FOOTER_HTML`     | Footer text (replaces the default IMAP-trust line if set).    |
+
+#### Structured footer links (Impressum, Datenschutz, …)
+
+| Variable             | Format                                                        |
+| -------------------- | ------------------------------------------------------------- |
+| `BRAND_FOOTER_LINKS` | JSON list of `{"label": "…", "href": "…"}` pairs.             |
+
+Renders as a centered `·`-separated row in the footer. Useful for the EU
+legal-page links every German-speaking tenant needs:
+
+```bash
+BRAND_FOOTER_LINKS='[{"label":"Impressum","href":"https://example.com/impressum"},{"label":"Datenschutz","href":"https://example.com/datenschutz"}]'
+```
+
+The bridge does **not** host the legal pages itself — link to whichever
+public URL your tenant already serves them from (their main website, a
+static-site stack, etc.). Keeps tenant content out of the bridge's release
+cycle.
+
+#### Visual
+
+| Variable               | Use                                                                       |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `BRAND_ACCENT_COLOR`   | CSS color for the submit button + focus ring (e.g. `#7c3aed`).            |
+| `BRAND_BACKGROUND_URL` | Optional full-page background image (rendered behind a contrast overlay). |
+
+#### String overrides (lighter than full i18n)
+
+For any deployment that needs labels in another language, override individual
+strings rather than dragging in a translation framework. Defaults are English.
+
+| Variable                  | Default            |
+| ------------------------- | ------------------ |
+| `BRAND_LABEL_EMAIL`       | `Email`            |
+| `BRAND_LABEL_PASSWORD`    | `Password`         |
+| `BRAND_LABEL_SUBMIT`      | `Sign in`          |
+| `BRAND_LABEL_SUBMITTING`  | `Signing in…`      |
+| `BRAND_PLACEHOLDER_EMAIL` | `you@example.com`  |
+
+For German, set `BRAND_TITLE=Anmelden`, `BRAND_LABEL_EMAIL=E-Mail`,
+`BRAND_LABEL_PASSWORD=Passwort`, `BRAND_LABEL_SUBMIT=Anmelden`,
+`BRAND_LABEL_SUBMITTING=Anmelden…` — and the form is fully localized.
+
+#### Worked example
+
+A real-world deployment for a hypothetical "imsteinig" tenant:
+
+```bash
+BRAND_LOGO_URL=https://logo.example.org/logo.svg?sub=imsteinig
+BRAND_TITLE=Anmelden
+BRAND_SUBTEXT=Mit deinem imsteinig.de-Postfach anmelden.
+BRAND_BELOW_FORM_HTML=Probleme? Schreib an <a href="mailto:admin@imsteinig.de">admin@imsteinig.de</a>.
+BRAND_FOOTER_LINKS=[{"label":"Impressum","href":"https://imsteinig.de/impressum"},{"label":"Datenschutz","href":"https://imsteinig.de/datenschutz"}]
+BRAND_ACCENT_COLOR=#0ea5e9
+BRAND_LABEL_EMAIL=E-Mail
+BRAND_LABEL_PASSWORD=Passwort
+BRAND_LABEL_SUBMIT=Anmelden
+BRAND_LABEL_SUBMITTING=Anmelden…
+```
 
 ## Wiring it into Authentik
 
@@ -194,11 +272,14 @@ won't accept the new identity — confusing error messages.
 
 ## Limitations / roadmap
 
-- v0.1.0a3 (now): source-only — no prebuilt image is published. Build from
-  the `Dockerfile` in your own environment. Branded login form added.
-- v0.2: PKCE, refresh tokens, Hetzner-style autoconfig discovery.
-- v0.3: multi-client (so one container can serve multiple consumers).
-- v0.4: optional groups via a static membership map, for "all imap users → group X" without Authentik policies.
+- v0.2.0 (now): source-only — no prebuilt image is published. Build from
+  the `Dockerfile` in your own environment. Login-form branding: logo,
+  HTML content slots (header / below-form / footer), structured footer
+  links (Impressum etc.), accent color, optional background image, per-
+  string overrides for any-language deployments.
+- v0.3: PKCE, refresh tokens, Hetzner-style autoconfig discovery.
+- v0.4: multi-client (so one container can serve multiple consumers).
+- v0.5: optional groups via a static membership map, for "all imap users → group X" without Authentik policies.
 - Not planned: writes back to IMAP (account creation, password change). The
   bridge is read-only by design; account lifecycle stays in your mail
   provider's UI.

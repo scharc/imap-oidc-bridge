@@ -41,9 +41,13 @@ class Settings(BaseSettings):
     bind_host: str = Field("0.0.0.0", description="Uvicorn bind host")
     bind_port: int = Field(8000, description="Uvicorn bind port")
 
+    # ── Branding (login form) ──────────────────────────────────────────────
+    # The form ships with neutral defaults and pulls no external assets unless
+    # one of these is set. Everything is optional. URL fields render as-is in
+    # `<img>` tags; HTML slots render verbatim (operator-trusted content only).
     brand_logo_url: str | None = Field(
         None,
-        description="Optional URL of an SVG/PNG shown above the login form (e.g. a wordmark).",
+        description="URL of an SVG/PNG shown above the login form (a wordmark).",
     )
     brand_title: str = Field(
         "Sign in",
@@ -53,6 +57,43 @@ class Settings(BaseSettings):
         "Sign in with your mailbox credentials.",
         description="Hint text shown under the heading.",
     )
+    brand_header_html: str | None = Field(
+        None,
+        description="Free HTML rendered above the title (banner, welcome message).",
+    )
+    brand_below_form_html: str | None = Field(
+        None,
+        description="Free HTML rendered between the submit button and the footer.",
+    )
+    brand_footer_html: str | None = Field(
+        None,
+        description="Free HTML in the footer (replaces the default IMAP-trust line).",
+    )
+    brand_footer_links: list[dict[str, str]] = Field(
+        default_factory=list,
+        description=(
+            "List of {label, href} pairs rendered as a centered ·-separated row "
+            "in the footer. JSON-encoded in env: "
+            '\'[{"label": "Impressum", "href": "https://example.com/impressum"}]\''
+        ),
+    )
+    brand_accent_color: str | None = Field(
+        None,
+        description="CSS color for the submit button + focus ring (e.g. '#7c3aed').",
+    )
+    brand_background_url: str | None = Field(
+        None,
+        description="Optional full-page background image URL.",
+    )
+
+    # Per-string overrides — lighter than full i18n. Operators who want German
+    # set BRAND_LABEL_EMAIL=E-Mail etc. without dragging in a translation
+    # framework. Defaults stay English.
+    brand_label_email: str = Field("Email")
+    brand_label_password: str = Field("Password")
+    brand_label_submit: str = Field("Sign in")
+    brand_label_submitting: str = Field("Signing in…")
+    brand_placeholder_email: str = Field("you@example.com")
 
     @property
     def issuer(self) -> str:

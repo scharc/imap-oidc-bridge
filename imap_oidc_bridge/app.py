@@ -57,6 +57,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         directory=str(Path(__file__).parent / "templates"),
     )
 
+    def _brand_context() -> dict[str, object]:
+        """Static brand fields fed to the login template — one source of truth."""
+        return {
+            "title": settings.brand_title,
+            "subtext": settings.brand_subtext,
+            "logo_url": settings.brand_logo_url,
+            "header_html": settings.brand_header_html,
+            "below_form_html": settings.brand_below_form_html,
+            "footer_html": settings.brand_footer_html,
+            "footer_links": settings.brand_footer_links,
+            "accent_color": settings.brand_accent_color,
+            "background_url": settings.brand_background_url,
+            "label_email": settings.brand_label_email,
+            "label_password": settings.brand_label_password,
+            "label_submit": settings.brand_label_submit,
+            "label_submitting": settings.brand_label_submitting,
+            "placeholder_email": settings.brand_placeholder_email,
+        }
+
     app = FastAPI(title="imap-oidc-bridge", version=__version__)
 
     @app.get("/healthz", include_in_schema=False)
@@ -106,9 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request,
             "login.html",
             {
-                "title": settings.brand_title,
-                "subtext": settings.brand_subtext,
-                "logo_url": settings.brand_logo_url,
+                **_brand_context(),
                 "form_action": "/authorize",
                 "request_id": pending,
                 "error": None,
@@ -136,9 +153,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 request,
                 "login.html",
                 {
-                    "title": settings.brand_title,
-                    "subtext": settings.brand_subtext,
-                    "logo_url": settings.brand_logo_url,
+                    **_brand_context(),
                     "form_action": "/authorize",
                     "request_id": request_id,
                     "error": str(exc),
