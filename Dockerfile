@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.23
+# syntax=docker/dockerfile:1.26
 
-FROM harbor.zkm.de/dockerhub-cache/library/python:3.14-slim AS builder
+FROM python:3.14-slim AS builder
 ENV POETRY_VERSION=1.8.4 \
     PIP_NO_CACHE_DIR=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
@@ -12,7 +12,7 @@ RUN poetry install --only main --no-root
 COPY imap_oidc_bridge ./imap_oidc_bridge
 RUN poetry install --only main
 
-FROM harbor.zkm.de/dockerhub-cache/library/python:3.14-slim AS runtime
+FROM python:3.14-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"

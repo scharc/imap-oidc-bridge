@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="{{ lang|default('en') }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>{{ title }}</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --card: #ffffff;
+        --fg: #0f172a;
+        --muted: #64748b;
+        --border: #d4d4d8;
+        --border-strong: #94a3b8;
+        --accent: {{ accent_color or '#2563eb' }};
+        --accent-hover: color-mix(in srgb, var(--accent) 85%, black);
+        --accent-active: color-mix(in srgb, var(--accent) 70%, black);
+        --focus-ring: color-mix(in srgb, var(--accent) 35%, transparent);
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.08);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0f1a;
+          --card: #111827;
+          --fg: #e5e7eb;
+          --muted: #94a3b8;
+          --border: #1f2937;
+          --border-strong: #374151;
+          --accent-hover: color-mix(in srgb, var(--accent) 75%, white);
+          --accent-active: color-mix(in srgb, var(--accent) 60%, black);
+          --focus-ring: color-mix(in srgb, var(--accent) 45%, transparent);
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        padding: 1.5rem;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        {%- if background_url %}
+        background-image: linear-gradient(color-mix(in srgb, var(--bg) 70%, transparent), color-mix(in srgb, var(--bg) 70%, transparent)), url("{{ background_url }}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        {%- endif %}
+      }
+      .header-html {
+        max-width: 26rem;
+        width: 100%;
+        text-align: center;
+        color: var(--fg);
+        font-size: 0.95rem;
+      }
+      .card {
+        width: 100%;
+        max-width: 26rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        padding: 2rem 1.75rem 1.75rem;
+        text-align: center;
+      }
+      .logo {
+        display: block;
+        margin: 0 auto 1.25rem;
+        max-width: 100%;
+        max-height: 4.5rem;
+        height: auto;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .hint {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      .hint p { margin: 0 0 0.6rem; }
+      .hint p:last-child { margin-bottom: 0; }
+      .home-btn {
+        display: inline-block;
+        margin-top: 1.5rem;
+        padding: 0.65rem 1.4rem;
+        font-weight: 600;
+        color: white;
+        background: var(--accent);
+        border: 0;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: background 120ms ease, transform 60ms ease, box-shadow 120ms ease;
+      }
+      .home-btn:hover { background: var(--accent-hover); }
+      .home-btn:active { background: var(--accent-active); transform: translateY(1px); }
+      .home-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+      .footer {
+        margin: 1.25rem 0 0;
+        text-align: center;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .footer a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+      .footer-links {
+        margin: 0.85rem 0 0;
+        text-align: center;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .footer-links a {
+        color: inherit;
+        text-decoration: none;
+        margin: 0 0.5rem;
+        white-space: nowrap;
+      }
+      .footer-links a:hover { text-decoration: underline; text-underline-offset: 2px; }
+      .footer-links a + a::before {
+        content: "·";
+        margin-right: 1rem;
+        margin-left: -0.5rem;
+        color: var(--border-strong);
+      }
+      @media (max-width: 380px) {
+        .card { padding: 1.5rem 1.25rem 1.25rem; border-radius: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    {% if header_html %}
+      <div class="header-html">{{ header_html|safe }}</div>
+    {% endif %}
+
+    <main class="card" role="main">
+      {% if logo_url %}
+        <img class="logo" src="{{ logo_url }}" alt="" aria-hidden="true" />
+      {% endif %}
+      <h1>{{ title }}</h1>
+
+      {% if landing_html %}
+        <div class="hint">{{ landing_html|safe }}</div>
+      {% else %}
+        <p class="hint">{{ subtext }}</p>
+      {% endif %}
+
+      {% if home_url %}
+        <a class="home-btn" href="{{ home_url }}">{{ home_label }}</a>
+      {% endif %}
+
+      {% if footer_html %}
+        <p class="footer">{{ footer_html|safe }}</p>
+      {% endif %}
+
+      {% if footer_links %}
+        <nav class="footer-links" aria-label="{{ aria_footer_links }}">
+          {% for link in footer_links -%}
+            <a href="{{ link.href }}" rel="noopener">{{ link.label }}</a>
+          {%- endfor %}
+        </nav>
+      {% endif %}
+    </main>
+  </body>
+</html>

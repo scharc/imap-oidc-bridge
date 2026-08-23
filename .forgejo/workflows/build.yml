@@ -17,7 +17,7 @@ jobs:
     runs-on: docker
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: login to forgejo registry
         run: |
@@ -30,11 +30,16 @@ jobs:
         run: |
           set -eux
           IMAGE=git.schuetze.io/cluster/imap-oidc-bridge
+          DATE="$(date +%Y.%m.%d)"
           SHA="${{ github.sha }}"
           SHORT_SHA="${SHA:0:7}"
+          RUN="$(printf '%04d' "${{ github.run_number }}")"
+          VERSION="${DATE}-${RUN}"
           docker build \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:${DATE}" \
             --tag "${IMAGE}:latest" \
-            --tag "${IMAGE}:${SHORT_SHA}" \
             .
+          docker push "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:${DATE}"
           docker push "${IMAGE}:latest"
-          docker push "${IMAGE}:${SHORT_SHA}"

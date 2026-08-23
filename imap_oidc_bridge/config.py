@@ -86,6 +86,23 @@ class Settings(BaseSettings):
         description="Optional full-page background image URL.",
     )
 
+    # ── Root landing page (GET /) ─────────────────────────────────────────
+    # Served when someone opens the bare bridge host directly instead of
+    # arriving via an app's OIDC redirect. Reveals nothing about the service;
+    # just a friendly, on-brand nudge back to signing in.
+    brand_landing_html: str | None = Field(
+        None,
+        description="Free HTML body for the landing page. Falls back to brand_subtext.",
+    )
+    brand_home_url: str | None = Field(
+        None,
+        description="If set, the landing page shows a button linking here (the tenant's main app/portal).",
+    )
+    brand_home_label: str = Field(
+        "Continue",
+        description="Label of the landing-page button (only shown when brand_home_url is set).",
+    )
+
     # Per-string overrides — lighter than full i18n. Operators who want German
     # set BRAND_LABEL_EMAIL=E-Mail etc. without dragging in a translation
     # framework. Defaults stay English.

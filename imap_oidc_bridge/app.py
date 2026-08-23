@@ -84,6 +84,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/", include_in_schema=False)
+    async def landing(request: Request) -> Response:
+        return templates.TemplateResponse(
+            request,
+            "landing.html",
+            {
+                **_brand_context(),
+                "landing_html": settings.brand_landing_html,
+                "home_url": settings.brand_home_url,
+                "home_label": settings.brand_home_label,
+            },
+        )
+
     @app.get("/.well-known/openid-configuration")
     async def discovery() -> JSONResponse:
         return JSONResponse(discovery_document(settings))
